@@ -1,3 +1,7 @@
 rootProject.name = "appointment-manager"
 
-include("app")
+include(
+    "appointment-manager-domain",
+    "appointment-manager-application",
+    "appointment-manager-adapters",
+)

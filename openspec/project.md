@@ -24,6 +24,7 @@ This is an appointment scheduling system designed for a tattoo artist business. 
 - Follow standard Kotlin coding conventions
 - Use Kotlin DSL for Gradle build scripts
 - Package structure based on hexagonal architecture (see Architecture Patterns section)
+- Do not add comments unless explicitly asked for
 - Naming conventions:
   - Classes: PascalCase
   - Functions/variables: camelCase
@@ -31,32 +32,48 @@ This is an appointment scheduling system designed for a tattoo artist business. 
   - Test classes: `<ClassName>Test`
   - Test functions: descriptive names with backticks for readability
 
+### Build Configuration
+**Gradle Conventions**:
+- Use multi-line includes in `settings.gradle.kts`:
+  ```kotlin
+  include(
+      "appointment-manager-domain",
+      "appointment-manager-application",
+      "appointment-manager-adapters",
+  )
+  ```
+- All dependencies managed via version catalog (`gradle/libs.versions.toml`)
+- Use `alias(libs.plugins.*)` for plugins, never hardcode versions
+- Trailing commas in multi-line collections
+- Module naming: `appointment-manager-{layer}` pattern
+
 ### Architecture Patterns
 This project follows **Domain-Driven Design (DDD)** with **Hexagonal Architecture** (Ports & Adapters):
 
 **Module Structure**:
 ```
-domain/
+appointment-manager-domain/
   ├── entities/
   ├── valueobjects/
   ├── aggregates/
   ├── events/
   └── services/
 
-application/
+appointment-manager-application/
   ├── ports/
   │   ├── input/          # Inbound ports (use case interfaces)
   │   └── output/         # Outbound ports (repository/service interfaces)
   └── usecases/           # Business use cases implementing input ports
 
-adapters/
+appointment-manager-adapters/
   ├── input/
   │   ├── rest/           # REST API controllers (inbound)
   │   ├── cli/            # Command-line interface (if needed)
   │   └── scheduler/      # Cron job handlers
   └── output/
       ├── rest/           # HTTP REST clients for external services
-      └── persistence/    # Database implementations
+      └── db/
+          └── postgres/   # PostgreSQL database implementations
 ```
 
 **Key Principles**:
@@ -65,7 +82,12 @@ adapters/
 - **Dependency Inversion**: Domain depends on nothing; all dependencies point inward
 - Domain layer must remain framework-agnostic
 - Application layer defines ports (interfaces), adapters implement them
-- Output adapters are organized by technology (REST, persistence, etc.), not by specific external service
+- Output adapters are organized by technology using hierarchical naming:
+  - Use pattern: `output/{category}/{technology}`
+  - Database adapters: `output/db/postgres/`, `output/db/redis/`
+  - External API adapters: `output/rest/google-calendar/`, `output/rest/instagram/`
+  - NOT flat naming: ~~`output/postgres/`~~, ~~`output/persistence/`~~
+  - Principle: Name by specific technology, not abstract concepts
 
 ### Testing Strategy
 This project follows **Acceptance Test-Driven Development (ATDD)** with **Test-Driven Development (TDD)**:
@@ -139,9 +161,32 @@ This project follows **Acceptance Test-Driven Development (ATDD)** with **Test-D
 - MockK for mocking (Kotlin-friendly)
 - Kotest matchers for fluent assertions
 
+**Assertion Style**:
+- Prefer Kotest infix matchers for readability:
+  - Use: `result.isSuccess shouldBe true`
+  - Avoid: ~~`assertTrue(result.isSuccess)`~~
+- Common Kotest matchers: `shouldBe`, `shouldNotBe`, `shouldContain`, `shouldBeEmpty`, etc.
+- Infix notation reads like natural language
+
 **ATDD/BDD Requirements**:
 - All tests (acceptance, unit, integration) must use Given-When-Then structure
-- Use Kotlin DSL functionality (Kotest BDD or custom DSL) for Given/When/Then blocks
+- **Given/When/Then Implementation**:
+  - For straightforward unit tests: use simple comments
+    ```kotlin
+    @Test
+    fun `should validate phone number`() {
+        // Given
+        val phoneNumber = "+491234567890"
+
+        // When
+        val result = PhoneNumber.of(phoneNumber)
+
+        // Then
+        result.isSuccess shouldBe true
+    }
+    ```
+  - Extract test data to variables in the Given block (avoid mixing Given and When)
+  - For complex acceptance tests: use Kotest BDD DSL or custom DSL with step functions
 - Step functions within blocks must use Kotlin's backtick syntax for readability
 - Function names should read like natural language and describe business behavior
 - Acceptance tests should be written BEFORE implementation (outside-in TDD)
