@@ -68,27 +68,87 @@ adapters/
 - Output adapters are organized by technology (REST, persistence, etc.), not by specific external service
 
 ### Testing Strategy
-This project follows **Test-Driven Development (TDD)**:
+This project follows **Acceptance Test-Driven Development (ATDD)** with **Test-Driven Development (TDD)**:
 
 1. **Red**: Write a failing test first
 2. **Green**: Write minimal code to make the test pass
 3. **Refactor**: Improve code while keeping tests green
 
 **Test Types**:
+- **Acceptance Tests (ATDD/BDD)**: Written in BDD style using Kotlin DSL with Given-When-Then structure
+  - Use Kotlin's backtick syntax for readable step function names
+  - Organize tests with Given/When/Then blocks using Kotlin DSL
+  - Focus on business scenarios and user acceptance criteria
+  - Written before implementation to capture requirements
+  - Example test structure:
+    ```kotlin
+    @Test
+    fun `should send care instructions after an appointment`() {
+        Given {
+            `an artist scheduled an appointment`()
+            `the appointment is due today`()
+        }
+
+        When {
+            `the appointment has passed`()
+        }
+
+        Then {
+            `we expect take care instructions to be sent to the client`()
+        }
+    }
+    ```
+  - Use Kotest's BDD DSL or create custom Given/When/Then DSL functions
+  - Step functions use backtick syntax for natural language readability
+  - Test end-to-end user journeys and business workflows
+  - Tests serve as executable specifications
+
 - **Unit Tests**: Test individual classes/functions in isolation with mocks
   - Focus on domain logic and business rules
   - Mock external dependencies
+  - Use Given/When/Then structure with backtick-named helper functions
+  - Example unit test structure:
+    ```kotlin
+    @Test
+    fun `should calculate appointment reminder time correctly`() {
+        Given {
+            `an appointment scheduled for tomorrow at 2pm`()
+        }
+
+        When {
+            `calculating the reminder time`()
+        }
+
+        Then {
+            `reminder time should be today at 2pm`()
+        }
+    }
+    ```
+
 - **Integration Tests**: Test components working together
   - Database integration tests
   - API endpoint tests
   - External service integration tests
+  - Use BDD-style naming to describe integration scenarios
 
 **Test Coverage**: Aim for high coverage especially in domain layer (business-critical logic)
 
 **Testing Tools**:
-- JUnit Jupiter for test framework
-- Mockito/MockK for mocking
-- Consider Kotest for more idiomatic Kotlin testing
+- Kotest for BDD-style DSL and expressive matchers
+- JUnit Jupiter for additional test framework support
+- MockK for mocking (Kotlin-friendly)
+- Kotest matchers for fluent assertions
+
+**ATDD/BDD Requirements**:
+- All tests (acceptance, unit, integration) must use Given-When-Then structure
+- Use Kotlin DSL functionality (Kotest BDD or custom DSL) for Given/When/Then blocks
+- Step functions within blocks must use Kotlin's backtick syntax for readability
+- Function names should read like natural language and describe business behavior
+- Acceptance tests should be written BEFORE implementation (outside-in TDD)
+- Tests should serve as living documentation of system behavior
+- Avoid technical jargon; use business domain language in test names
+- Each Given/When/Then block can contain multiple step functions
+- Step functions should be reusable across different test scenarios
 
 ### Git Workflow
 **Trunk-Based Development**:
