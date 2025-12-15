@@ -47,6 +47,24 @@ This is an appointment scheduling system designed for a tattoo artist business. 
 - Trailing commas in multi-line collections
 - Module naming: `appointment-manager-{layer}` pattern
 
+### OpenSpec Workflow
+**Implementation Completion Requirements**:
+
+Every OpenSpec change implementation MUST be completed with the following validation steps:
+
+1. **Build Validation**: Call `@build-validator` to ensure the build is successful
+   - Verifies that `./gradlew build` completes without errors
+   - Confirms all modules compile correctly
+   - Ensures all tests pass
+
+2. **Code Standards Compliance**: Call `@openspec-compliance-checker` to ensure code standards are enforced
+   - Validates adherence to project conventions
+   - Checks hexagonal architecture boundaries
+   - Verifies test coverage and quality standards
+   - Confirms OpenSpec delta requirements are met
+
+**These validation steps are MANDATORY** and must be completed before marking any OpenSpec change as complete.
+
 ### Architecture Patterns
 This project follows **Domain-Driven Design (DDD)** with **Hexagonal Architecture** (Ports & Adapters):
 
