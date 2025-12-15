@@ -24,13 +24,42 @@ This is an appointment scheduling system designed for a tattoo artist business. 
 - Follow standard Kotlin coding conventions
 - Use Kotlin DSL for Gradle build scripts
 - Package structure based on hexagonal architecture (see Architecture Patterns section)
-- Do not add comments unless explicitly asked for
+- **IMPORTANT: Do not add ANY comments (including KDoc, doc comments, or inline comments) unless explicitly asked for**
+  - This applies to ALL code: classes, functions, properties, enums, sealed classes, etc.
+  - Write self-explanatory code that doesn't require comments
+  - Use descriptive names for types and functions instead of adding documentation
 - Naming conventions:
   - Classes: PascalCase
   - Functions/variables: camelCase
   - Constants: UPPER_SNAKE_CASE
   - Test classes: `<ClassName>Test`
   - Test functions: descriptive names with backticks for readability
+  - Factory methods that generate new instances: Use `fun new()` instead of `fun generate()` or `fun create()`
+    - Example: `ClientId.new()` not `ClientId.generate()`
+    - Example: `AppointmentId.new()` not `AppointmentId.generate()`
+- Single-expression functions:
+  - For single-line functions, use expression body without explicit return type when clear from context
+  - Example: `fun of(value: String) = Result.success(PhoneNumber(value))`
+  - NOT: `fun of(value: String): Result<PhoneNumber> { return Result.success(PhoneNumber(value)) }`
+  - Use when return type and behavior are obvious from the expression
+- Validation and assertions:
+  - Use Kotlin's idiomatic `require()` for preconditions and `check()` for state validation
+  - Prefer `require()` and `check()` over explicit if-statements with exceptions
+  - Example: `require(value.startsWith("+")) { "Phone number must start with +" }`
+  - NOT: `if (!value.startsWith("+")) { throw IllegalArgumentException("...") }`
+  - For factory methods returning `Result<T>`, catch exceptions and convert to Result.failure
+  - Use `runCatching { }` to wrap validation logic that uses require/check
+- Infix functions for DSL-like APIs:
+  - Use infix functions to create readable, fluent APIs in value objects
+  - Example: `Duration ofMinutes 120` instead of `Duration.ofMinutes(120)`
+  - Pattern: `companion object { infix fun ofMinutes(minutes: Int) = ... }`
+  - Benefits: More natural language-like syntax, better readability in tests and business logic
+- Domain layer parameter conventions:
+  - **NEVER use default parameters in domain layer** - all values must be explicit
+  - Default parameters couple domain to infrastructure concerns
+  - Example: BAD: `fun of(localDateTime: LocalDateTime, zoneId: ZoneId = ZoneId.of("Europe/Berlin"))`
+  - Example: GOOD: `fun of(localDateTime: LocalDateTime, zoneId: ZoneId)`
+  - Rationale: Domain should be pure; configuration/defaults belong in application/adapter layers
 
 ### Build Configuration
 **Gradle Conventions**:
@@ -52,7 +81,7 @@ This is an appointment scheduling system designed for a tattoo artist business. 
 
 Every OpenSpec change implementation MUST be completed with the following validation steps:
 
-1. **Build Validation**: Call `@build-validator` to ensure the build is successful
+1. **Build Validation**: Call `@gradle-build-runner` to ensure the build is successful
    - Verifies that `./gradlew build` completes without errors
    - Confirms all modules compile correctly
    - Ensures all tests pass
@@ -64,6 +93,13 @@ Every OpenSpec change implementation MUST be completed with the following valida
    - Confirms OpenSpec delta requirements are met
 
 **These validation steps are MANDATORY** and must be completed before marking any OpenSpec change as complete.
+
+**Build Validation During Development**:
+- When the `@gradle-build-runner` agent is available (IDE mode), ALWAYS use it when you need to run tests or validate the build
+- When working via CLI or agents without subagent support, use `./gradlew` directly via Bash
+- The `@gradle-build-runner` agent (when available) provides proper test output and build validation
+- Use `@gradle-build-runner` (when available) during TDD cycles to verify tests pass/fail
+- For Gradle projects: Run tests with `./gradlew :module-name:test` or full build with `./gradlew build`
 
 ### Architecture Patterns
 This project follows **Domain-Driven Design (DDD)** with **Hexagonal Architecture** (Ports & Adapters):
@@ -107,12 +143,58 @@ appointment-manager-adapters/
   - NOT flat naming: ~~`output/postgres/`~~, ~~`output/persistence/`~~
   - Principle: Name by specific technology, not abstract concepts
 
+**Domain Layer Purity**:
+- **No infrastructure concerns in domain**: Domain entities and value objects must not contain infrastructure-specific logic or configuration
+  - BAD: Hardcoding timezone `ZoneId.of("Europe/Berlin")` in domain value objects
+  - GOOD: Accept timezone as parameter; application layer provides the configured value from `application.yml`
+  - Rationale: Infrastructure concerns (timezones, locales, external service URLs) should be configurable from adapters layer
+- **Effect pattern for domain events**: Use `Effect<T, E: DomainEvent>` to combine state changes with domain events
+  - Pattern: `data class Effect<out T, out E : DomainEvent>(val value: T, val event: E)`
+  - Methods return `Result<Effect<Aggregate, DomainEvent>>` instead of `Result<Pair<Aggregate, DomainEvent>>`
+  - Example: `fun cancel(...): Result<Effect<Appointment, AppointmentCancelled>>`
+  - Benefits: Type-safe, self-documenting, clear separation of state and events
+  - Helper: `fun <T, E : DomainEvent> effect(value: T, event: E) = Effect(value, event)`
+- **Domain services as pure functions**: Domain services receive all necessary data as parameters
+  - Services do not depend on repositories or external services
+  - Application layer fetches data and passes to domain services
+  - Example: `fun detectConflicts(newAppointment: Appointment, existingAppointments: List<Appointment>)`
+  - Benefits: Easy to test (no mocking), follows functional programming principles, maintains hexagonal architecture
+- **Time-based vs explicit state transitions**: Consider whether domain behaviors should be explicit methods or derived from time/state
+  - Explicit: Operations that require business logic or validation (e.g., `cancel()` requires 24-hour notice)
+  - Derived: States that are automatically determined by time or other factors (e.g., appointments complete when time passes)
+  - Decision criteria: If business rules govern the transition, make it explicit; if it's deterministic based on external factors, derive it
+
 ### Testing Strategy
 This project follows **Acceptance Test-Driven Development (ATDD)** with **Test-Driven Development (TDD)**:
 
-1. **Red**: Write a failing test first
-2. **Green**: Write minimal code to make the test pass
+**MANDATORY TDD WORKFLOW** - MUST be followed strictly:
+1. **Red**: Write ONE failing test first (ALWAYS write a single test before ANY implementation code)
+2. **Green**: Write minimal code to make THAT ONE test pass
 3. **Refactor**: Improve code while keeping tests green
+4. **Repeat**: Go back to step 1 for the next test case
+
+**CRITICAL RULES**:
+- NEVER write production code before writing a failing test
+- NEVER write ALL tests at once - write ONE test at a time
+- NEVER write implementation code without a corresponding test for behavior
+- The TDD cycle is: ONE test → implementation → refactor → NEXT test
+- DO NOT batch write multiple tests before implementation
+- DO NOT write complete test suites upfront
+- Tests must be written FIRST, but ONE AT A TIME
+- DO NOT write meaningless tests (e.g., testing that an instance is an instance of its own type)
+- DO NOT test simple data structures without behavior (enums without methods, sealed classes without logic, simple data holders)
+- ONLY write tests for actual behavior:
+  - Value objects WITH validation (PhoneNumber.of(), EmailAddress.of())
+  - Entities with business logic (Appointment.cancel(), Client.updateContactInfo())
+  - Domain services (AppointmentConflictDetector, CancellationPolicyValidator)
+  - Methods that can fail or have conditions
+
+**TDD PROCESS EXAMPLE**:
+1. Write first test (e.g., "should create phone number with valid format") → FAILS
+2. Implement minimal code to make it pass → GREEN
+3. Write second test (e.g., "should reject phone without plus sign") → FAILS
+4. Update implementation to handle this case → GREEN
+5. Continue one test at a time until all scenarios covered
 
 **Test Types**:
 - **Acceptance Tests (ATDD/BDD)**: Written in BDD style using Kotlin DSL with Given-When-Then structure
@@ -146,8 +228,23 @@ This project follows **Acceptance Test-Driven Development (ATDD)** with **Test-D
 - **Unit Tests**: Test individual classes/functions in isolation with mocks
   - Focus on domain logic and business rules
   - Mock external dependencies
-  - Use Given/When/Then structure with backtick-named helper functions
-  - Example unit test structure:
+  - MUST use Given/When/Then structure with comments (// Given, // When, // Then)
+  - Extract test data to variables in the Given block (avoid mixing Given and When)
+  - Example unit test structure for simple tests:
+    ```kotlin
+    @Test
+    fun `should validate phone number`() {
+        // Given
+        val phoneNumber = "+491234567890"
+
+        // When
+        val result = PhoneNumber.of(phoneNumber)
+
+        // Then
+        result.isSuccess shouldBe true
+    }
+    ```
+  - For complex tests with multiple steps, use backtick-named helper functions:
     ```kotlin
     @Test
     fun `should calculate appointment reminder time correctly`() {
@@ -173,11 +270,26 @@ This project follows **Acceptance Test-Driven Development (ATDD)** with **Test-D
 
 **Test Coverage**: Aim for high coverage especially in domain layer (business-critical logic)
 
+**Test Fixtures**:
+- **Use fixtures in domain tests** to reduce duplication and improve readability
+- Create fixture functions with **accessible domain language** that reflects business concepts
+- Pattern: Simple factory functions that return commonly-needed test objects
+- Examples:
+  ```kotlin
+  fun scheduledAppointment() = Appointment.schedule(...).getOrThrow().value
+  fun cancelledAppointment() = scheduledAppointment().cancel(...).getOrThrow().value
+  fun clientWithEmail() = Client.create(..., ContactInformation.EmailContact(...)).getOrThrow()
+  fun clientWithWhatsApp() = Client.create(..., ContactInformation.WhatsAppContact(...)).getOrThrow()
+  ```
+- Benefits: Tests become more readable, setup code is reusable, domain language is consistent
+- Place fixtures in test files or shared fixture objects as needed
+- Fixtures can accept parameters for customization while providing sensible defaults
+
 **Testing Tools**:
-- Kotest for BDD-style DSL and expressive matchers
-- JUnit Jupiter for additional test framework support
+- JUnit Jupiter for test framework (use @Test annotation and JUnit test structure)
+- Kotest assertions ONLY for matchers (shouldBe, shouldNotBe, etc.) - NO Kotest test specs
 - MockK for mocking (Kotlin-friendly)
-- Kotest matchers for fluent assertions
+- DO NOT use Kotest FunSpec, StringSpec, or any Kotest test specs - use JUnit @Test methods only
 
 **Assertion Style**:
 - Prefer Kotest infix matchers for readability:
@@ -185,6 +297,18 @@ This project follows **Acceptance Test-Driven Development (ATDD)** with **Test-D
   - Avoid: ~~`assertTrue(result.isSuccess)`~~
 - Common Kotest matchers: `shouldBe`, `shouldNotBe`, `shouldContain`, `shouldBeEmpty`, etc.
 - Infix notation reads like natural language
+- Null safety in tests:
+  - **NEVER use not-null assertion (`!!`)** - always use safe assertions
+  - Use `shouldNotBeNull()` assertion before accessing nullable values
+  - Example pattern:
+    ```kotlin
+    val effect = result.getOrNull()
+    effect.shouldNotBeNull()
+    effect.value.id shouldBe expectedId
+    ```
+  - Alternative with safe call: `result.getOrNull()?.value shouldBe "expected"`
+  - NOT: `result.getOrNull()!!.value shouldBe "expected"`
+  - Rationale: `shouldNotBeNull()` provides clear test failure messages; `!!` throws NPE without context
 
 **ATDD/BDD Requirements**:
 - All tests (acceptance, unit, integration) must use Given-When-Then structure
@@ -260,6 +384,38 @@ This project follows **Acceptance Test-Driven Development (ATDD)** with **Test-D
 - Care instructions must be sent only after appointment completion
 - Each client has a preferred communication channel that should be respected
 - All times are in Berlin timezone (Europe/Berlin)
+
+### Value Object Patterns
+
+**Factory Method Patterns**:
+- Use `of()` for value objects with validation that can fail
+  - Returns `Result<T>` to make failure explicit
+  - Example: `PhoneNumber.of("+491234567890")` returns `Result<PhoneNumber>`
+  - Use `runCatching { }` with `require()` statements for validation
+- Use `new()` for ID generation that cannot fail
+  - Example: `ClientId.new()` generates new UUID-based ID
+  - Returns the value object directly, not wrapped in Result
+- Consider infix functions for fluent, readable APIs
+  - Example: `Duration ofMinutes 120` instead of `Duration.ofMinutes(120)`
+  - Use when it creates more natural, domain-language-like expressions
+
+**Inline Value Classes**:
+- Use `@JvmInline value class` for zero-cost type safety
+- Wraps primitives (String, Int, UUID) with domain meaning
+- No runtime overhead - compiles to primitives
+- Examples: `ClientId`, `AppointmentId`, `PhoneNumber`, `EmailAddress`, `Duration`
+
+**Validation Strategies**:
+- Validate once at construction time (fail-fast)
+- Make invalid states unrepresentable (can't create invalid value objects)
+- Place validation in factory methods, not primary constructor
+- Return `Result<T>` for operations that can fail due to business rules
+
+**Sealed Classes for Domain Concepts**:
+- Use sealed classes when variants have different data or behavior
+- Example: `ContactInformation` sealed class with variants for Instagram, WhatsApp, Facebook, Email
+- Benefits: Exhaustive when expressions, type-safe pattern matching
+- Each variant can have its own properties while sharing common interface
 
 ### Domain Events (to consider)
 - `AppointmentScheduled`

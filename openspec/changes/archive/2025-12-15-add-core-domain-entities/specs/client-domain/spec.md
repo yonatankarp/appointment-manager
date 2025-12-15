@@ -95,10 +95,12 @@ The system SHALL track when clients are created and updated.
 - **AND** updatedAt timestamp is set to current time
 
 ### Requirement: Client Immutability
-The system SHALL treat clients as immutable value objects.
+The system SHALL treat clients as immutable entities.
 
 #### Scenario: Client modifications create new instances
 - **GIVEN** an existing client
-- **WHEN** modifying client information
+- **WHEN** modifying client information (via data class copy)
 - **THEN** a new client instance is created
 - **AND** the original client remains unchanged
+
+**Note**: Client is implemented as a Kotlin data class, providing immutability through the generated `copy()` method. Explicit update methods will be added in future iterations when update business logic is required.
