@@ -168,10 +168,42 @@ appointment-manager-adapters/
   - Application layer fetches data and passes to domain services
   - Example: `fun detectConflicts(newAppointment: Appointment, existingAppointments: List<Appointment>)`
   - Benefits: Easy to test (no mocking), follows functional programming principles, maintains hexagonal architecture
+  - **Injection pattern**: Domain services are classes (not objects) that get injected as constructor dependencies
+    - This allows them to be configured as Spring beans in adapters layer
+    - Example: `class ScheduleAppointmentUseCase(private val conflictDetector: AppointmentConflictDetector, ...)`
+    - NOT: `AppointmentConflictDetector.detectConflicts()` as static call
 - **Time-based vs explicit state transitions**: Consider whether domain behaviors should be explicit methods or derived from time/state
   - Explicit: Operations that require business logic or validation (e.g., `cancel()` requires 24-hour notice)
   - Derived: States that are automatically determined by time or other factors (e.g., appointments complete when time passes)
   - Decision criteria: If business rules govern the transition, make it explicit; if it's deterministic based on external factors, derive it
+- **Operator overloading for value objects**: Add operators to value objects to support domain operations without exposing internals
+  - Example: `AppointmentDateTime` with `operator fun plus(duration: Duration)` for time calculations
+  - Example: `operator fun compareTo(other: ZonedDateTime)` for date comparisons
+  - Provide conversion methods when needed: `fun toZonedDateTime()` for port integration
+  - Benefits: Encapsulation, fluent domain language, prevents direct access to internal values
+
+**Application Layer Patterns**:
+- **Command Pattern for Input Ports**: Wrap use case parameters in command objects
+  - Pattern: Create `Command` data classes in `ports/input/command/` package
+  - Example: `ScheduleAppointmentCommand(clientId, localDateTime, duration, serviceType)`
+  - Benefits: Single parameter to use case, easier to evolve, clear intent
+- **Infix Functions for Use Case Execution**: Input ports use `infix fun execute(command: Command)`
+  - Allows fluent syntax: `useCase execute command`
+  - Benefits: Readable, domain-like language
+- **Invoke Operators for Output Ports**: Output ports use `operator fun invoke()` instead of named methods
+  - Pattern: Port name already indicates purpose, so method can be unnamed
+  - Example: `SaveAppointmentPort` with `operator fun invoke(appointment: Appointment)`
+  - Usage: `saveAppointment(appointment)` instead of `saveAppointment.save(appointment)`
+  - Benefits: Cleaner, less verbose, port name self-documents
+- **One Port Per Responsibility (Strict SRP)**: Each output port interface has exactly one method
+  - Pattern: `FindClientByIdPort`, `SaveAppointmentPort`, `FindAppointmentsInTimeRangePort`
+  - Each adapter class implements exactly one port
+  - Adapter classes can share underlying infrastructure (e.g., same JPA repository)
+  - Benefits: Clear responsibilities, easier testing, explicit dependencies
+- **Use Domain Objects Directly**: Application layer works with domain objects, not application DTOs
+  - Use cases accept and return domain entities, value objects, and aggregates
+  - Adapters are responsible for converting to/from their protocol formats
+  - Benefits: Less mapping, clearer boundaries, simpler application layer
 
 ### Testing Strategy
 This project follows **Acceptance Test-Driven Development (ATDD)** with **Test-Driven Development (TDD)**:
@@ -311,7 +343,28 @@ This project follows **Acceptance Test-Driven Development (ATDD)** with **Test-D
   - **Specific named fixtures without parameters**: `fun johnDoe()`, `fun aliceWonder()` - common test personas
   - **Domain language naming**: `emailClient()` not `clientWithEmail()` - reads naturally
   - **Communication variants**: `emailClient()`, `whatsAppClient()`, `instagramClient()`, `facebookClient()`
+  - **Time fixtures**: `yesterday()`, `tomorrow()`, `inTwoDays()`, `inAWeek()` - relative time helpers
   - Pattern: Provide both generic (with params) and specific (no params) variants when useful
+
+- **Shared Fixtures vs Test-Local Fixtures**:
+  - **Shared fixtures** (in `src/testFixtures/kotlin/`): Reusable across modules
+    - Domain fixtures: entities, value objects, aggregates
+    - Shared utilities: time helpers, common test data
+    - Package structure: `fixtures/entities/`, `fixtures/valueobjects/`, `fixtures/shared/`
+  - **Test-local fixtures** (in test class): Specific to single test class
+    - Pattern: Create nested `Fixtures` object within test class
+    - Example:
+      ```kotlin
+      class ScheduleAppointmentUseCaseTest {
+          // ...
+          private object Fixtures {
+              fun scheduleAppointmentCommand(...) = ScheduleAppointmentCommand(...)
+              fun appointmentDateTime(...) = AppointmentDateTime.of(...)
+          }
+      }
+      ```
+    - Use static imports: `import TestClass.Fixtures.fixtureMethod`
+    - Benefits: Keeps test-specific setup close to tests, avoids polluting shared fixtures
 
 - **Fixture Composition Hierarchy**:
   - Build fixtures in layers: ValueObjects → Entities → Aggregates
@@ -362,6 +415,45 @@ This project follows **Acceptance Test-Driven Development (ATDD)** with **Test-D
 - Kotest assertions ONLY for matchers (shouldBe, shouldNotBe, etc.) - NO Kotest test specs
 - MockK for mocking (Kotlin-friendly)
 - DO NOT use Kotest FunSpec, StringSpec, or any Kotest test specs - use JUnit @Test methods only
+
+**Mock Management Patterns**:
+- **Reuse mocks across tests**: Define mocks as class-level `val` properties, not recreate in each test
+  - Example: `private val saveAppointment: SaveAppointmentPort = mockk()`
+  - Use `clearAllMocks()` in `@BeforeEach` to reset state between tests
+  - Benefits: Less object creation, consistent test setup
+- **Factory function for system under test**: Create private function to instantiate use case
+  - Place at end of test class for better readability
+  - Example:
+    ```kotlin
+    private fun createUseCase() = ScheduleAppointmentUseCase(
+        saveAppointment = saveAppointment,
+        findClient = findClient,
+        // ...
+    )
+    ```
+  - Call in each test's Given section for clarity
+  - Benefits: Single source of truth, easier to update constructor
+- **Given/When/Then structure in tests**:
+  - Always create use case in Given section (not before test)
+  - Setup mocks in Given section
+  - Execute behavior in When section
+  - Verify expectations in Then section
+  - Example:
+    ```kotlin
+    @Test
+    fun `should fail when client not found`() {
+        // Given
+        val useCase = createUseCase()
+        val command = scheduleAppointmentCommand()
+        every { findClient(command.clientId) } returns null
+
+        // When
+        val result = useCase execute command
+
+        // Then
+        result.isFailure shouldBe true
+    }
+    ```
 
 **Assertion Style**:
 - Prefer Kotest infix matchers for readability:
