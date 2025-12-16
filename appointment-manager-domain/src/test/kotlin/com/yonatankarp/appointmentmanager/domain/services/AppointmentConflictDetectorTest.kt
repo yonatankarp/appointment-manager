@@ -1,10 +1,10 @@
 package com.yonatankarp.appointmentmanager.domain.services
 
 import com.yonatankarp.appointmentmanager.domain.aggregates.Appointment
-import com.yonatankarp.appointmentmanager.domain.fixtures.AppointmentDateTimeFixtures.berlinDateTime
-import com.yonatankarp.appointmentmanager.domain.fixtures.AppointmentFixtures.scheduledAppointment
-import com.yonatankarp.appointmentmanager.domain.fixtures.ClientIdFixtures.clientId
-import com.yonatankarp.appointmentmanager.domain.fixtures.DurationFixtures.duration
+import com.yonatankarp.appointmentmanager.domain.fixtures.valueobjects.AppointmentDateTimeFixtures.berlinDateTime
+import com.yonatankarp.appointmentmanager.domain.fixtures.aggregates.AppointmentFixtures.scheduledAppointment
+import com.yonatankarp.appointmentmanager.domain.fixtures.valueobjects.ClientIdFixtures.clientId
+import com.yonatankarp.appointmentmanager.domain.fixtures.valueobjects.DurationFixtures.duration
 import com.yonatankarp.appointmentmanager.domain.valueobjects.AppointmentDateTime
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.collections.shouldHaveSize

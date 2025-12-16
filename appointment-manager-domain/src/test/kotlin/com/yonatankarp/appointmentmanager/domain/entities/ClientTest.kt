@@ -1,16 +1,16 @@
 package com.yonatankarp.appointmentmanager.domain.entities
 
-import com.yonatankarp.appointmentmanager.domain.fixtures.ClientNameFixtures.aliceWonder
-import com.yonatankarp.appointmentmanager.domain.fixtures.ClientNameFixtures.bobArtist
-import com.yonatankarp.appointmentmanager.domain.fixtures.ClientNameFixtures.janeSmith
-import com.yonatankarp.appointmentmanager.domain.fixtures.ClientNameFixtures.johnDoe
-import com.yonatankarp.appointmentmanager.domain.fixtures.ContactInformationFixtures.emailContact
-import com.yonatankarp.appointmentmanager.domain.fixtures.ContactInformationFixtures.facebookContact
-import com.yonatankarp.appointmentmanager.domain.fixtures.ContactInformationFixtures.instagramContact
-import com.yonatankarp.appointmentmanager.domain.fixtures.ContactInformationFixtures.whatsAppContact
-import com.yonatankarp.appointmentmanager.domain.fixtures.LanguageFixtures.english
-import com.yonatankarp.appointmentmanager.domain.fixtures.LanguageFixtures.german
-import com.yonatankarp.appointmentmanager.domain.fixtures.LanguageFixtures.hebrew
+import com.yonatankarp.appointmentmanager.domain.fixtures.valueobjects.ClientNameFixtures.aliceWonder
+import com.yonatankarp.appointmentmanager.domain.fixtures.valueobjects.ClientNameFixtures.bobArtist
+import com.yonatankarp.appointmentmanager.domain.fixtures.valueobjects.ClientNameFixtures.janeSmith
+import com.yonatankarp.appointmentmanager.domain.fixtures.valueobjects.ClientNameFixtures.johnDoe
+import com.yonatankarp.appointmentmanager.domain.fixtures.valueobjects.ContactInformationFixtures.emailContact
+import com.yonatankarp.appointmentmanager.domain.fixtures.valueobjects.ContactInformationFixtures.facebookContact
+import com.yonatankarp.appointmentmanager.domain.fixtures.valueobjects.ContactInformationFixtures.instagramContact
+import com.yonatankarp.appointmentmanager.domain.fixtures.valueobjects.ContactInformationFixtures.whatsAppContact
+import com.yonatankarp.appointmentmanager.domain.fixtures.valueobjects.LanguageFixtures.english
+import com.yonatankarp.appointmentmanager.domain.fixtures.valueobjects.LanguageFixtures.german
+import com.yonatankarp.appointmentmanager.domain.fixtures.valueobjects.LanguageFixtures.hebrew
 import com.yonatankarp.appointmentmanager.domain.valueobjects.CommunicationChannel
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test

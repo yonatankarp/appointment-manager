@@ -1,6 +1,9 @@
-package com.yonatankarp.appointmentmanager.domain.fixtures
+package com.yonatankarp.appointmentmanager.domain.fixtures.entities
 
 import com.yonatankarp.appointmentmanager.domain.entities.Client
+import com.yonatankarp.appointmentmanager.domain.fixtures.valueobjects.ClientNameFixtures
+import com.yonatankarp.appointmentmanager.domain.fixtures.valueobjects.ContactInformationFixtures
+import com.yonatankarp.appointmentmanager.domain.fixtures.valueobjects.LanguageFixtures
 import com.yonatankarp.appointmentmanager.domain.valueobjects.ClientName
 import com.yonatankarp.appointmentmanager.domain.valueobjects.ContactInformation
 import com.yonatankarp.appointmentmanager.domain.valueobjects.Language

@@ -1,4 +1,4 @@
-package com.yonatankarp.appointmentmanager.domain.fixtures
+package com.yonatankarp.appointmentmanager.domain.fixtures.valueobjects
 
 import com.yonatankarp.appointmentmanager.domain.valueobjects.Duration
 

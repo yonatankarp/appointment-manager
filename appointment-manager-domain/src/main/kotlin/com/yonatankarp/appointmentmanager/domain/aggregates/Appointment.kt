@@ -8,6 +8,7 @@ import com.yonatankarp.appointmentmanager.domain.valueobjects.AppointmentStatus
 import com.yonatankarp.appointmentmanager.domain.valueobjects.ClientId
 import com.yonatankarp.appointmentmanager.domain.valueobjects.Duration
 import com.yonatankarp.appointmentmanager.domain.valueobjects.Effect
+import com.yonatankarp.appointmentmanager.domain.valueobjects.ServiceType
 import com.yonatankarp.appointmentmanager.domain.valueobjects.effect
 import java.time.Instant
 import java.time.ZonedDateTime
@@ -18,7 +19,7 @@ data class Appointment(
     val dateTime: AppointmentDateTime,
     val duration: Duration,
     val status: AppointmentStatus,
-    val serviceType: String,
+    val serviceType: ServiceType,
     val createdAt: Instant,
     val updatedAt: Instant,
     val cancelledAt: Instant?,
@@ -38,7 +39,7 @@ data class Appointment(
 
     fun cancel(reason: String?, now: ZonedDateTime): Result<Effect<Appointment, AppointmentCancelled>> = runCatching {
         require(status == AppointmentStatus.SCHEDULED) { "Can only cancel scheduled appointments" }
-        require(dateTime.value.isAfter(now.plusHours(24))) { "Cannot cancel appointment within 24 hours of scheduled time" }
+        require(dateTime.value.isBefore(now.plusHours(24)).not()) { "Cannot cancel appointment within 24 hours of scheduled time" }
 
         val cancelledAppointment = this.copy(
             status = AppointmentStatus.CANCELLED,
@@ -60,10 +61,8 @@ data class Appointment(
             clientId: ClientId,
             dateTime: AppointmentDateTime,
             duration: Duration,
-            serviceType: String,
+            serviceType: ServiceType,
         ): Result<Effect<Appointment, AppointmentScheduled>> = runCatching {
-            require(serviceType.isNotBlank()) { "Service type cannot be blank" }
-
             val now = Instant.now()
             val appointment = Appointment(
                 id = AppointmentId.new(),
