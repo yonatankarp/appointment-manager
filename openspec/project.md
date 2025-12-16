@@ -95,11 +95,20 @@ Every OpenSpec change implementation MUST be completed with the following valida
 **These validation steps are MANDATORY** and must be completed before marking any OpenSpec change as complete.
 
 **Build Validation During Development**:
-- When the `@gradle-build-runner` agent is available (IDE mode), ALWAYS use it when you need to run tests or validate the build
-- When working via CLI or agents without subagent support, use `./gradlew` directly via Bash
-- The `@gradle-build-runner` agent (when available) provides proper test output and build validation
-- Use `@gradle-build-runner` (when available) during TDD cycles to verify tests pass/fail
-- For Gradle projects: Run tests with `./gradlew :module-name:test` or full build with `./gradlew build`
+- **ALWAYS use the `gradle-build-runner` agent for ALL build-related tasks**:
+  - Running tests (`./gradlew test`, `./gradlew :module:test`)
+  - Building the project (`./gradlew build`)
+  - Compiling code (`./gradlew compileKotlin`)
+  - Any Gradle command execution
+  - During TDD cycles to verify tests pass/fail
+  - After making code changes to verify compilation
+- **NEVER run Gradle commands directly via Bash** for build/test tasks - use the Task tool with `subagent_type: "gradle-build-runner"` instead
+- The `gradle-build-runner` agent provides:
+  - Proper test output formatting and error reporting
+  - Build validation with clear success/failure status
+  - Better error diagnostics for compilation issues
+  - Consistent build verification workflow
+- Exception: The gradle-build-runner agent is only available when listed in your available agents. If not available, fall back to using Bash with `./gradlew` commands
 
 ### Architecture Patterns
 This project follows **Domain-Driven Design (DDD)** with **Hexagonal Architecture** (Ports & Adapters):
@@ -271,19 +280,82 @@ This project follows **Acceptance Test-Driven Development (ATDD)** with **Test-D
 **Test Coverage**: Aim for high coverage especially in domain layer (business-critical logic)
 
 **Test Fixtures**:
-- **Use fixtures in domain tests** to reduce duplication and improve readability
-- Create fixture functions with **accessible domain language** that reflects business concepts
-- Pattern: Simple factory functions that return commonly-needed test objects
-- Examples:
-  ```kotlin
-  fun scheduledAppointment() = Appointment.schedule(...).getOrThrow().value
-  fun cancelledAppointment() = scheduledAppointment().cancel(...).getOrThrow().value
-  fun clientWithEmail() = Client.create(..., ContactInformation.EmailContact(...)).getOrThrow()
-  fun clientWithWhatsApp() = Client.create(..., ContactInformation.WhatsAppContact(...)).getOrThrow()
-  ```
-- Benefits: Tests become more readable, setup code is reusable, domain language is consistent
-- Place fixtures in test files or shared fixture objects as needed
-- Fixtures can accept parameters for customization while providing sensible defaults
+- **Use Gradle's `java-test-fixtures` plugin** for sharing test fixtures across modules
+  - Add `java-test-fixtures` plugin to module's `build.gradle.kts`
+  - Place fixtures in `src/testFixtures/kotlin/` directory
+  - Other modules consume via: `testImplementation(testFixtures(project(":module-name")))`
+  - Benefits: Type-safe, properly scoped, sharable across all test types
+
+- **Fixture Organization Pattern**:
+  - **One fixture file per domain type** (e.g., ClientFixtures.kt, AppointmentFixtures.kt)
+  - **Wrap fixtures in objects** to avoid polluting global scope
+  - Example:
+    ```kotlin
+    object ClientFixtures {
+        fun emailClient() = Client.create(...).getOrThrow()
+        fun whatsAppClient() = Client.create(...).getOrThrow()
+    }
+    ```
+  - **Use static imports** for readability in fixture implementations:
+    ```kotlin
+    import com.example.fixtures.ClientIdFixtures.clientId
+
+    fun emailClient() = Client.create(
+        name = clientName(),  // Clean, no object prefix
+        contactInfo = emailContact(),
+    )
+    ```
+
+- **Fixture Naming Conventions**:
+  - **Generic fixtures with parameters**: `fun clientName(name: String)` - flexible for custom values
+  - **Specific named fixtures without parameters**: `fun johnDoe()`, `fun aliceWonder()` - common test personas
+  - **Domain language naming**: `emailClient()` not `clientWithEmail()` - reads naturally
+  - **Communication variants**: `emailClient()`, `whatsAppClient()`, `instagramClient()`, `facebookClient()`
+  - Pattern: Provide both generic (with params) and specific (no params) variants when useful
+
+- **Fixture Composition Hierarchy**:
+  - Build fixtures in layers: ValueObjects → Entities → Aggregates
+  - Higher-level fixtures use lower-level ones
+  - Example:
+    ```kotlin
+    // ValueObjectFixtures
+    fun clientId() = ClientId.new()
+    fun emailAddress() = EmailAddress.of("test@example.com").getOrThrow()
+
+    // EntityFixtures (uses ValueObjectFixtures)
+    fun emailClient() = Client.create(
+        name = johnDoe(),
+        contactInfo = emailContact(),
+    ).getOrThrow()
+
+    // AggregateFixtures (uses EntityFixtures + ValueObjectFixtures)
+    fun scheduledAppointment() = Appointment.schedule(
+        clientId = clientId(),
+        dateTime = berlinDateTime(),
+    ).getOrThrow().value
+    ```
+
+- **When to Use Fixtures**:
+  - ✅ **DO use** in entity tests, aggregate tests, service tests, integration tests
+  - ❌ **DON'T use** in value object validation tests - these test the factory methods themselves
+  - Example: `EmailAddressTest` tests `EmailAddress.of()` validation, so it doesn't use `emailAddress()` fixture
+  - Fixtures are for reducing setup boilerplate in higher-level tests, not for testing the builders
+
+- **Fixture Function Design**:
+  - Return unwrapped values (call `.getOrThrow()` in fixture, not in tests)
+  - Provide sensible defaults that work for most test cases
+  - Allow parameter overrides for specific test scenarios
+  - Example:
+    ```kotlin
+    fun scheduledAppointment(
+        clientId: ClientId = clientId(),
+        dateTime: AppointmentDateTime = berlinDateTime(),
+        duration: Duration = duration(),
+        serviceType: String = "Tattoo Session",
+    ) = Appointment.schedule(clientId, dateTime, duration, serviceType).getOrThrow().value
+    ```
+
+- Benefits: Tests become more readable, setup code is reusable, domain language is consistent across all test types
 
 **Testing Tools**:
 - JUnit Jupiter for test framework (use @Test annotation and JUnit test structure)

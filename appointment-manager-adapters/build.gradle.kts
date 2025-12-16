@@ -6,6 +6,7 @@ dependencies {
     implementation(project(":appointment-manager-application"))
     implementation(project(":appointment-manager-domain"))
 
+    testImplementation(testFixtures(project(":appointment-manager-domain")))
     testImplementation(libs.bundles.unit.test)
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
